@@ -4,7 +4,7 @@
 
 **Topic idea 1**: Vocal track extraction / instrument separation toolset
 
-**Goal:** Create a simple to use(!) program for extracting specific instruments from a song and cleaning them up to sound passable. Must support common pop/rock instruments, such as vocals, guitars, drums (at least partly), and bass. Potentially allow mixing and matching various songs and instruments.
+**Goal:** Create a simple to use(!) program for extracting specific instruments from a song (using Mel features, probably) and cleaning them up to sound passable. Must support common pop/rock instruments, such as vocals, guitars, drums (at least partly), and bass. Potentially allow mixing and matching various songs and instruments.
 
 **Topic idea 2**: An implementation of the [Audio Mosaicing](https://www.audiolabs-erlangen.de/resources/MIR/2015-ISMIR-LetItBee) technique using NMF-like algorithms
 
