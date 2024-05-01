@@ -11,3 +11,9 @@
 **Goal:** Create a program for transferring one "style" of a song to another -- dubbed mosaicing. E.g. melody and rhythm of "Let It Be" with the timbre of a swarm of bees buzzing. 
 
 **Team:** Anton Slavin
+
+---
+
+Notes:
+
+- https://kinwaicheuk.github.io/nnAudio/index.html
