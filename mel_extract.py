@@ -5,14 +5,18 @@ import numpy as np
 import soundfile
 import librosa
 
+HLEN = 1024
+NFFT = 2048
+
 
 def get_inverse_mel(y, sr, n=64, fmin=20, fmax=8000):
     # Calculate power spectogram
-    D = np.abs(librosa.stft(y))**2
+    D = np.abs(librosa.stft(y, n_fft=NFFT, hop_length=HLEN, center=False))**2
 
     # Calculate mel-scaled spectrogram
-    mel = librosa.feature.melspectrogram(S=D, 
-                                         sr=sr, 
+    mel = librosa.feature.melspectrogram(S=D, sr=sr, 
+                                         n_fft=NFFT, hop_length=HLEN,
+                                         center=False,
                                          n_mels=n,  # bands
                                          fmin=fmin, # min freq
                                          fmax=fmax) # max freq
@@ -28,13 +32,18 @@ if __name__ == '__main__':
     if len(argv) > 1:
         audio_path = argv[1]
 
-    y, sr = librosa.load(audio_path, duration=10)
+    sr = librosa.get_samplerate(audio_path)
 
     # Process audio in chunks
+    stream = librosa.stream(audio_path,
+                        block_length=256,
+                        frame_length=NFFT,
+                        hop_length=HLEN,
+                        duration=None) # None for full
+
     audio_from_mel = []
-    step = 2048
-    for i in range(0, len(y), step):
-        audio_from_mel.extend(get_inverse_mel(y[i:i+step], sr, n=64))
+    for y_block in stream:
+        audio_from_mel.extend(get_inverse_mel(y_block, sr, n=128, fmax=sr/2))
     
     soundfile.write(f'{audio_path.split(".")[0]}_restored.wav', 
                        audio_from_mel, 
