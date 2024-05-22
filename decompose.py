@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+from pysndfx import AudioEffectsChain
 from sys import argv, exit
 import numpy as np
 import soundfile
@@ -10,13 +11,35 @@ HLEN = 4096
 NFFT = 4096
 
 
+def denoise(y, sr):
+    # Source: noise.py on github
+    cent = librosa.feature.spectral_centroid(y=y, sr=sr)
+
+    threshold_h = round(np.median(cent))*1.5
+    threshold_l = round(np.median(cent))*0.1
+
+    less_noise = AudioEffectsChain().lowshelf(gain=-20.0, frequency=threshold_l, slope=0.8).highshelf(gain=-10.0, frequency=threshold_h, slope=0.5).limiter(gain=10.0)
+    y_clean = less_noise(y)
+
+    return y_clean
+
+
+def lowpass(y, freq):
+    flter = AudioEffectsChain().lowpass(frequency=freq).limiter(gain=5.0)
+    return flter(y)
+
+def highpass(y, freq):
+    flter = AudioEffectsChain().highpass(frequency=freq).limiter(gain=5.0)
+    return flter(y)
+
+
 def decompose_hpcc(y, sr):
-    D = librosa.stft(y, center=True)
+    y_for_vocals = highpass(lowpass(y, freq=15000), freq=90)
 
-    S_full, phase = librosa.magphase(D)
+    S_full, phase = librosa.magphase(librosa.stft(y_for_vocals, center=True))
 
-    # For rhythm.drums
-    H, perc = librosa.decompose.hpss(D, margin=(1.0,2.2))
+    # For rhythm, drums
+    H, perc = librosa.decompose.hpss(librosa.stft(y, center=True), margin=(2.0,4.2))
 
     # Ugly, but a temp failsafe for shorter frames
     try: 
@@ -33,31 +56,30 @@ def decompose_hpcc(y, sr):
     S_filter = np.minimum(S_full, S_filter)
 
     # Extract vocals vs the rest
-    margin_i, margin_v = 5, 9
     mask_i = librosa.util.softmask(S_filter,
-                                   margin_i * (S_full - S_filter),
+                                   3 * (S_full - S_filter),
                                    power=2)
 
     mask_v = librosa.util.softmask(S_full - S_filter,
-                                   margin_v * S_filter,
+                                   10 * S_filter,
                                    power=2)
 
     S_foreground = mask_v * S_full
     S_background = mask_i * S_full
 
-    # TODO cut out everything in 300-1200 Hz for Bass and apply lowpass
-    # TODO low pass for vocals
     y_foreground = librosa.istft(S_foreground * phase)
+    y_foreground = lowpass(y_foreground, freq=2000)
     y_bass = librosa.istft(S_background * phase)
 
     # Try to clean up drums from the vocal part
-    vocal_H, _ = librosa.decompose.hpss(S_foreground, margin=2.0)
+    # vocal_H, _ = librosa.decompose.hpss(S_foreground, margin=2.0)
 
     # TODO further filtering for drums, clean up with hpss?
     y_perc = librosa.istft(perc * phase)
-    y_vocal = librosa.istft(vocal_H * phase)
+    # y_vocal = librosa.istft(vocal_H * phase)
+    y_vocal_clean = denoise(y_foreground, sr)
 
-    return (y_perc,y_vocal,y_foreground,y_bass)
+    return (y_perc,y_vocal_clean,y_foreground,y_bass)
 
 
 if __name__ == '__main__':
@@ -72,7 +94,7 @@ if __name__ == '__main__':
                         block_length=BLEN,
                         frame_length=NFFT,
                         hop_length=HLEN,
-                        duration=100,
+                        duration=None,
                         mono=True)
 
     perc = []
