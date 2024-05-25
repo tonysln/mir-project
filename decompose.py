@@ -2,6 +2,7 @@
 
 from pysndfx import AudioEffectsChain
 from sys import argv, exit
+import vocal_remover as vr
 import numpy as np
 import soundfile
 import librosa
@@ -10,19 +11,10 @@ BLEN = 1024
 HLEN = 4096
 NFFT = 4096
 
-# TODO:
+# NB! Using vocal-remover code from: https://github.com/tsurumeso/vocal-remover.
+# Modified to support mono based on: https://github.com/tsurumeso/vocal-remover/pull/144.
+# Further modified to make our own custom calls and essentially merged with our code.
 
-# Probably use tsurumeso/vocal-remover to separate into *good* vocal stem + *excellent* bg
-#       -> side: probably just fork it and combine with our code to avoid unnecessary STFT etc
-
-# Extract drums from BG, processing?
-# Clean up vocal stem with EQ
-# Then apply pitch shift/stretch operations to try and match tempo + key
-# Combine samples (watch out for clipping) and run ISTFT
-
-# GUI: PySide? 
-
-# TODO2: other CNN-based clean-up tools for vocals
 
 
 def lowpass(y, freq):
@@ -38,9 +30,7 @@ def decompose_hpcc(y, sr):
     y_for_vocals = highpass(lowpass(y, freq=15000), freq=90)
 
     S_full, phase = librosa.magphase(librosa.stft(y_for_vocals, center=True))
-
-    # For rhythm, drums
-    H, perc = librosa.decompose.hpss(librosa.stft(y, center=True), margin=(2.0,3.0))
+    _, perc = librosa.decompose.hpss(librosa.stft(y, center=True), margin=(1.0,2.0))
 
     # Ugly, but a temp failsafe for shorter frames
     try: 
@@ -68,26 +58,14 @@ def decompose_hpcc(y, sr):
     S_background = mask_i * S_full
 
     y_foreground = librosa.istft(S_foreground * phase)
-    #y_foreground = lowpass(y_foreground, freq=2000)
-    y_bass = librosa.istft(S_background * phase)
+    y_background = librosa.istft(S_background * phase)
+    y_percussion = librosa.istft(perc * phase)
 
-    # Try to clean up drums from the vocal part 
-    # vocal_H, _ = librosa.decompose.hpss(S_foreground, margin=2.0)
-
-    y_perc = librosa.istft(perc * phase)
-    # y_vocal_clean = tg(S_foreground)
-
-    return (y_perc,y_foreground,y_foreground,y_bass)
+    return (y_foreground,y_background,y_percussion)
 
 
-if __name__ == '__main__':
-    audio_path = 'audio/feel.mp3' 
-    if len(argv) > 1:
-        audio_path = argv[1]
-
-    sr = librosa.get_samplerate(audio_path)
-
-    # Process audio in chunks
+def run_decomposer(audio_path, sr):
+    print('[+] Opening file in chunks...')
     stream = librosa.stream(audio_path,
                         block_length=BLEN,
                         frame_length=NFFT,
@@ -96,32 +74,55 @@ if __name__ == '__main__':
                         mono=True)
 
     perc = []
-    vocal = []
     fore = []
     back = []
+    print('[+] Decomposing...')
     for y_block in stream:
-        y_perc,y_vocal,y_fore,y_back = decompose_hpcc(y_block, sr)
+        y_fore,y_back,y_perc = decompose_hpcc(y_block, sr)
         perc.extend(y_perc)
         fore.extend(y_fore)
-        vocal.extend(y_vocal)
         back.extend(y_back)
+
+    print('[+] Saving results...')
     
     soundfile.write(f'{audio_path.split(".")[0]}_drums.wav', 
                        perc, 
-                       44100, 
-                       subtype='PCM_24')
-
-    soundfile.write(f'{audio_path.split(".")[0]}_vocal.wav', 
-                       vocal, 
-                       44100, 
-                       subtype='PCM_24')
+                       sr)
 
     soundfile.write(f'{audio_path.split(".")[0]}_melody.wav', 
                        fore, 
-                       44100, 
-                       subtype='PCM_24')
+                       sr)
 
-    soundfile.write(f'{audio_path.split(".")[0]}_bass.wav', 
+    soundfile.write(f'{audio_path.split(".")[0]}_backing.wav', 
                        back, 
-                       44100, 
-                       subtype='PCM_24')
+                       sr)
+
+
+def run_vocal_remover(audio_path, sr):
+    print('[+] Calling vocal-remover...')
+    y_vocal_w,y_back_w = vr.direct_call(audio_path, sr)
+
+    print('[+] Saving results...')
+    soundfile.write(f'{audio_path.split(".")[0]}_vocal_nn.wav', 
+                       y_vocal_w.T, 
+                       sr)
+
+    soundfile.write(f'{audio_path.split(".")[0]}_backing_nn.wav', 
+                       y_back_w.T, 
+                       sr)
+
+
+if __name__ == '__main__':
+    audio_path = 'audio/feel.mp3' 
+    if len(argv) > 1:
+        audio_path = argv[1]
+
+    # TODO keep track of audio names for processed parts 
+    sr = librosa.get_samplerate(audio_path)
+
+    run_vocal_remover(audio_path, sr)
+
+    fname = audio_path.split(".")[0]
+    run_decomposer(fname + '_backing_nn.wav', sr)
+
+    print('[+] Done.')
