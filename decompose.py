@@ -64,14 +64,9 @@ def decompose_hpcc(y, sr):
     return (y_foreground,y_background,y_percussion)
 
 
-def run_decomposer(audio_path, sr):
+def run_decomposer(audio, sr):
     print('[+] Opening file in chunks...')
-    stream = librosa.stream(audio_path,
-                        block_length=BLEN,
-                        frame_length=NFFT,
-                        hop_length=HLEN,
-                        duration=None,
-                        mono=True)
+    stream = [audio[i:i + BLEN] for i in range(0, len(audio), BLEN)]
 
     perc = []
     fore = []
@@ -83,19 +78,7 @@ def run_decomposer(audio_path, sr):
         fore.extend(y_fore)
         back.extend(y_back)
 
-    print('[+] Saving results...')
-    
-    soundfile.write(f'{audio_path.split(".")[0]}_drums.wav', 
-                       perc, 
-                       sr)
-
-    soundfile.write(f'{audio_path.split(".")[0]}_melody.wav', 
-                       fore, 
-                       sr)
-
-    soundfile.write(f'{audio_path.split(".")[0]}_backing.wav', 
-                       back, 
-                       sr)
+    return (fore,back,perc)
 
 
 def run_vocal_remover(audio_path, sr):
