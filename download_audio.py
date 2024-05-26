@@ -2,7 +2,7 @@ import subprocess
 from pytube import YouTube
 import librosa
 import os
-
+import soundfile
 
 # Convert mp4 to wav
 def convert_mp4_to_wav(mp4_path):
@@ -28,3 +28,7 @@ def load_audio_from_file(path, duration = 180):
     audio, sr = librosa.load(path, duration = duration)
     #audio = np.clip(audio, 0, 1)
     return audio, sr
+
+# Save file to disk
+def write_audio(path, y, sr):
+    soundfile.write(path, y, sr)
