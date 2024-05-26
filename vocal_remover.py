@@ -223,5 +223,35 @@ def direct_call(fname, sr, use_gpu=False):
 
     return (y_vocal_w,y_back_w)
 
+def direct_call_on_audio_array(audio, sr, use_gpu=False):
+    # Custom method to call the model directly with set parameters 
+    # from other py files without writing to disk
+
+    print('Loading model...', end=' ')
+    device = torch.device('cpu')
+    
+    model = nets.CascadedNet(2048, 1024, 32, 128)
+    model.load_state_dict(torch.load(DEFAULT_MODEL_PATH, map_location='cpu'))
+    model.to(device)
+    print('Done loading')
+
+    force_mono = audio.ndim == 1
+    X_spec = spec_utils.wave_to_spectrogram(audio, 1024, 2048)
+
+    sp = Separator(
+        model=model,
+        device=device,
+        batchsize=4,
+        cropsize=256,
+        postprocess='store_true'
+    )
+
+    print('Running separator...')
+    y_spec, v_spec = sp.separate(X_spec)
+    y_back_w = spec_utils.spectrogram_to_wave(y_spec, hop_length=1024, force_mono=force_mono)
+    y_vocal_w = spec_utils.spectrogram_to_wave(v_spec, hop_length=1024, force_mono=force_mono)
+
+    return (y_vocal_w,y_back_w)
+
 if __name__ == '__main__':
     main()
