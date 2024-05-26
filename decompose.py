@@ -64,9 +64,13 @@ def decompose_hpcc(y, sr):
     return (y_foreground,y_background,y_percussion)
 
 
-def run_decomposer(audio, sr):
+def run_decomposer(audio_path, sr):
     print('[+] Opening file in chunks...')
-    stream = [audio[i:i + BLEN] for i in range(0, len(audio), BLEN)]
+    stream = librosa.stream(audio_path,
+                        block_length=BLEN,
+                        frame_length=NFFT,
+                        hop_length=HLEN,
+                        duration=None)
 
     perc = []
     fore = []
