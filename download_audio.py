@@ -31,8 +31,12 @@ def load_audio_from_file(path, duration = 180):
 
 # Save file to disk
 def write_audio(path, y, sr):
-    #soundfile.write(path, y, sr)
-    with soundfile.SoundFile(path, 'w', samplerate=sr) as f:
+    if y.ndim == 1:
+        channels = 1
+    else:
+        channels = y.shape[1]
+
+    with soundfile.SoundFile(path, 'w', samplerate=sr, channels=channels) as f:
         f.write(y)
         f.flush()
 
