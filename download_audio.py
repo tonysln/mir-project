@@ -31,4 +31,8 @@ def load_audio_from_file(path, duration = 180):
 
 # Save file to disk
 def write_audio(path, y, sr):
-    soundfile.write(path, y, sr)
+    #soundfile.write(path, y, sr)
+    with soundfile.SoundFile(path, 'w', samplerate=sr) as f:
+        f.write(y)
+        f.flush()
+
