@@ -11,5 +11,9 @@ pytube
 pymusickit
 pysndfx
 pychorus
+chardet
 
-# ffmpeg must also be added using "conda install ffmpeg"
+
+# conda install jupyter
+# conda install ffmpeg
+# 
